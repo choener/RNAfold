@@ -12,7 +12,7 @@ stability:      experimental
 cabal-version:  >= 1.6.0
 synopsis:       RNA secondary structure prediction
 description:
-                RNAFold v2 using the ADPfusion library. The RNAfold algorithm
+                RNAfold v2 using the ADPfusion library. The RNAfold algorithm
                 is used to determine how fast we can be compared to a highly
                 optimized C program.
                 .
@@ -29,6 +29,7 @@ description:
 
 Extra-Source-Files:
   BioInf/RNAfold/QuickCheck.hs
+  README.md
 
 Flag llvm
   description: build using llvm backend
