@@ -1,5 +1,5 @@
 name:           RNAFold
-version:        1.99.1.0
+version:        1.99.1.1
 author:         Christian Hoener zu Siederdissen (Haskell), Ivo L. Hofacker et al (ViennaRNA), 2010-2012
 copyright:      Christian Hoener zu Siederdissen, 2010-2012
 homepage:       http://www.tbi.univie.ac.at/~choener/adpfusion
@@ -40,13 +40,13 @@ Flag llvm
 library
   build-depends:
     base >= 4 && < 5,
-    mtl,
-    strict,
+    mtl            >= 2,
+    strict         >= 0.3.2,
     primitive      == 0.4.*   ,
     vector         == 0.9.*   ,
     PrimitiveArray == 0.2.1.1 ,
-    BiobaseVienna  == 0.2.2.3 ,
-    BiobaseXNA     == 0.6.2.2 ,
+    BiobaseVienna  == 0.2.2.4 ,
+    BiobaseXNA     == 0.6.2.4 ,
     ADPfusion      == 0.0.1.0
   exposed-modules:
     BioInf.RNAfold
@@ -67,15 +67,15 @@ library
 
 executable RNAFold
   build-depends:
-    base >= 4 && < 5,
-    mtl,
-    strict,
-    primitive      == 0.4.*   ,
-    vector         == 0.9.*   ,
-    PrimitiveArray == 0.2.1.1 ,
-    BiobaseVienna  == 0.2.2.3 ,
-    BiobaseXNA     == 0.6.2.2 ,
-    ADPfusion      == 0.0.1.0
+--    base >= 4 && < 5,
+--    mtl,
+--    strict,
+--    primitive      == 0.4.*   ,
+--    vector         == 0.9.*   ,
+--    PrimitiveArray == 0.2.1.1 ,
+--    BiobaseVienna  == 0.2.2.3 ,
+--    BiobaseXNA     == 0.6.2.2 ,
+--    ADPfusion      == 0.0.1.0
   main-is:
     RNAFold.hs
   other-modules:
