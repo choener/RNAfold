@@ -1,5 +1,5 @@
 name:           RNAFold
-version:        1.99.1.1
+version:        1.99.1.2
 author:         Christian Hoener zu Siederdissen (Haskell), Ivo L. Hofacker et al (ViennaRNA), 2010-2012
 copyright:      Christian Hoener zu Siederdissen, 2010-2012
 homepage:       http://www.tbi.univie.ac.at/~choener/adpfusion
@@ -47,7 +47,7 @@ library
     PrimitiveArray == 0.2.1.1 ,
     BiobaseVienna  == 0.2.2.4 ,
     BiobaseXNA     == 0.6.2.4 ,
-    ADPfusion      == 0.0.1.0
+    ADPfusion      == 0.0.1.1
   exposed-modules:
     BioInf.RNAfold
     BioInf.RNAfold.Combinators
