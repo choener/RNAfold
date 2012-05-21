@@ -1,3 +1,4 @@
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE TupleSections #-}
@@ -90,15 +91,23 @@ rnafold ener inp = do
       hS = ScalarM . S.foldl' min (999999::Int)
       {-# INLINE hS #-}
 
-  weak   <- fromAssocsM (Z:.0:.0) (Z:.n:.n) 999999 []
-  block  <- fromAssocsM (Z:.0:.0) (Z:.n:.n) 999999 []
-  comps  <- fromAssocsM (Z:.0:.0) (Z:.n:.n) 999999 []
-  struct <- fromAssocsM (Z:.0:.0) (Z:.n:.n) 0 []
+  weak   :: MArr0 s DIM2 Int <- fromAssocsM (Z:.0:.0) (Z:.n:.n) 999999 []
+  block  :: MArr0 s DIM2 Int <- fromAssocsM (Z:.0:.0) (Z:.n:.n) 999999 []
+  comps  :: MArr0 s DIM2 Int <- fromAssocsM (Z:.0:.0) (Z:.n:.n) 999999 []
+  struct :: MArr0 s DIM2 Int <- fromAssocsM (Z:.0:.0) (Z:.n:.n) 0 []
+
+  let iif = iloopIF ener <<< primary #~~ weak ~~# primary ... hS
+      {-# INLINE [0] iif #-}
+
+  let mif = multiIF ener <<< block +~+ comps ... hS
+      {-# INLINE [0] mif #-}
 
   fillTables
     weak (
-      multiOF   ener <<< baseLr -~+ (multiIF ener <<< block +~+ comps              ... hS) +~- baselR |||
-      iloopOF   ener <<< baseLr -~+ (iloopIF ener <<< primary #~~ weak ~~# primary ... hS) +~- baselR |||
+      -- multiOF   ener <<< baseLr -~+ (multiIF ener <<< block +~+ comps              ... hS) +~- baselR |||
+      multiOF   ener <<< baseLr -~+ mif +~- baselR |||
+      -- iloopOF   ener <<< baseLr -~+ (iloopIF ener <<< primary #~~ weak ~~# primary ... hS) +~- baselR |||
+      iloopOF   ener <<< baseLr -~+ iif +~- baselR |||
       iloop1NF  ener <<< primary ---~+ weak +~@   primary   |||
       iloopN1F  ener <<< primary   @~+ weak +~--- primary   |||
       bulgeRF   ener <<< baseLr    -~+ weak +~*   primary   |||
