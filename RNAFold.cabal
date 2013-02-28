@@ -1,5 +1,5 @@
 name:           RNAFold
-version:        1.99.1.3
+version:        1.99.2.0
 author:         Christian Hoener zu Siederdissen (Haskell), Ivo L. Hofacker et al (ViennaRNA), 2010-2012
 copyright:      Christian Hoener zu Siederdissen, 2010-2012
 homepage:       http://www.tbi.univie.ac.at/~choener/adpfusion
@@ -31,40 +31,40 @@ Extra-Source-Files:
   BioInf/RNAfold/QuickCheck.hs
   README.md
 
-Flag llvm
-  description: build using llvm backend
-  default: True
-
 
 
 library
   build-depends:
     base >= 4 && < 5,
-    mtl            >= 2,
-    strict         >= 0.3.2,
-    primitive      == 0.4.*   ,
-    vector         == 0.9.*   ,
-    PrimitiveArray == 0.2.2.0 ,
-    BiobaseVienna  == 0.2.2.5 ,
-    BiobaseXNA     == 0.6.2.5 ,
-    ADPfusion      == 0.0.1.2
+--    mtl            >= 2,
+--    strict         >= 0.3.2,
+    primitive      >= 0.5     ,
+    vector         >= 0.10    ,
+    lens           >= 3.8     ,
+    repa           >= 3.2     ,
+    PrimitiveArray >= 0.5     ,
+    BiobaseTurner  >= 0.3     ,
+    BiobaseVienna  >= 0.3     ,
+    BiobaseXNA     >= 0.7     ,
+    ADPfusion      >= 0.1.1.0
   exposed-modules:
-    BioInf.RNAfold
-    BioInf.RNAfold.Combinators
-    BioInf.RNAfold.Energy
-    BioInf.RNAfold.Library
+    BioInf.RNAfold.GAPlike
+--    BioInf.RNAfold
+--    BioInf.RNAfold.Combinators
+--    BioInf.RNAfold.Energy
+--    BioInf.RNAfold.Library
   ghc-options:
-    -O2
-    -funbox-strict-fields
-    -fspec-constr
-    -fspec-constr-threshold=500
-    -fspec-constr-count=10
-    -funfolding-use-threshold100
-    -funfolding-keeness-factor100
-    -fsimplifier-phases10
-  if flag (llvm)
-    ghc-options:
-      -fllvm -optlo-O3 -optlo-inline -optlo-std-compile-opts
+--    -O2
+--    -funbox-strict-fields
+--    -fspec-constr
+--    -fspec-constr-threshold=500
+--    -fspec-constr-count=10
+--    -funfolding-use-threshold100
+--    -funfolding-keeness-factor100
+--    -fsimplifier-phases10
+--  if flag (llvm)
+--    ghc-options:
+--      -fllvm -optlo-O3 -optlo-inline -optlo-std-compile-opts
 
 
 
@@ -74,23 +74,23 @@ executable RNAFold
   main-is:
     RNAFold.hs
   other-modules:
-    BioInf.RNAfold
-    BioInf.RNAfold.Combinators
-    BioInf.RNAfold.Energy
-    BioInf.RNAfold.Library
+--    BioInf.RNAfold
+--    BioInf.RNAfold.Combinators
+--    BioInf.RNAfold.Energy
+--    BioInf.RNAfold.Library
   ghc-options:
     -rtsopts
-    -O2
+    -Odph
     -funbox-strict-fields
-    -fspec-constr
-    -fspec-constr-threshold=500
-    -fspec-constr-count=10
+--    -fspec-constr
+--    -fspec-constr-threshold=20
+--    -fspec-constr-count=10
     -funfolding-use-threshold100
     -funfolding-keeness-factor100
-    -fsimplifier-phases10
-  if flag (llvm)
-    ghc-options:
-      -fllvm -optlo-O3 -optlo-inline -optlo-std-compile-opts
+--    -fsimplifier-phases4
+    -fno-liberate-case
+    -fnew-codegen
+    -fllvm -optlo-O3 -optlo-inline -optlo-std-compile-opts
 
 
 
