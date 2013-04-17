@@ -1,7 +1,7 @@
 name:           RNAFold
-version:        1.99.2.0
-author:         Christian Hoener zu Siederdissen (Haskell), Ivo L. Hofacker et al (ViennaRNA), 2010-2012
-copyright:      Christian Hoener zu Siederdissen, 2010-2012
+version:        1.99.3.0
+author:         Christian Hoener zu Siederdissen (Haskell), Ivo L. Hofacker et al (ViennaRNA), 2010-2013
+copyright:      Christian Hoener zu Siederdissen, 2010-2013
 homepage:       http://www.tbi.univie.ac.at/~choener/adpfusion
 maintainer:     choener@tbi.univie.ac.at
 category:       Bioinformatics
@@ -16,19 +16,14 @@ description:
                 is used to determine how fast we can be compared to a highly
                 optimized C program.
                 .
-                If possible, build using the GHC llvm backend, and GHC-7.2.2.
-                GHC-7.4.x produces very bad code on my system, please benchmark
-                using 7.2.2.
+                Please use GHC 7.6 or newer.
                 .
                 NOTE I'd like to rename this package to RNAfold, like the C
                 implementation. Do not install "globally", especially if you
                 normally use RNAfold from the ViennaRNA package, for obvious
                 reasons.
-                .
-                NOTE I am reluctant to call this v2 for now.
 
 Extra-Source-Files:
-  BioInf/RNAfold/QuickCheck.hs
   README.md
 
 
@@ -37,7 +32,8 @@ library
   build-depends:
     base >= 4 && < 5,
 --    mtl            >= 2,
---    strict         >= 0.3.2,
+    strict         >= 0.3.2   ,
+    deepseq        >= 1.3     ,
     primitive      >= 0.5     ,
     vector         >= 0.10    ,
     lens           >= 3.8     ,
@@ -45,11 +41,11 @@ library
     PrimitiveArray >= 0.5     ,
     BiobaseTurner  >= 0.3     ,
     BiobaseVienna  >= 0.3     ,
-    BiobaseXNA     >= 0.7     ,
-    ADPfusion      >= 0.1.1.0
+    BiobaseXNA     >= 0.7     
+--    ADPfusion      >= 0.1.1.0
   exposed-modules:
-    BioInf.RNAfold.GAPlike
---    BioInf.RNAfold
+--    BioInf.RNAfold.GAPlike
+    BioInf.RNAfold
 --    BioInf.RNAfold.Combinators
 --    BioInf.RNAfold.Energy
 --    BioInf.RNAfold.Library
@@ -68,31 +64,31 @@ library
 
 
 
-executable RNAFold
-  build-depends:
---    we get all build depends from the library dependencies
-  main-is:
-    RNAFold.hs
-  other-modules:
---    BioInf.RNAfold
---    BioInf.RNAfold.Combinators
---    BioInf.RNAfold.Energy
---    BioInf.RNAfold.Library
-  ghc-options:
-    -rtsopts
-    -Odph
-    -funbox-strict-fields
---    -fspec-constr
---    -fspec-constr-threshold=20
---    -fspec-constr-count=10
-    -funfolding-use-threshold100
-    -funfolding-keeness-factor100
---    -fsimplifier-phases4
-    -fno-liberate-case
-    -fnew-codegen
-    -fllvm -optlo-O3 -optlo-inline -optlo-std-compile-opts
-
-
+--  executable RNAFold
+--    build-depends:
+--  --    we get all build depends from the library dependencies
+--    main-is:
+--      RNAFold.hs
+--    other-modules:
+--  --    BioInf.RNAfold
+--  --    BioInf.RNAfold.Combinators
+--  --    BioInf.RNAfold.Energy
+--  --    BioInf.RNAfold.Library
+--    ghc-options:
+--      -rtsopts
+--      -Odph
+--      -funbox-strict-fields
+--  --    -fspec-constr
+--  --    -fspec-constr-threshold=20
+--  --    -fspec-constr-count=10
+--      -funfolding-use-threshold100
+--      -funfolding-keeness-factor100
+--  --    -fsimplifier-phases4
+--      -fno-liberate-case
+--      -fnew-codegen
+--      -fllvm -optlo-O3 -optlo-inline -optlo-std-compile-opts
+--  
+--  
 
 source-repository head
   type: git

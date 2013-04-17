@@ -1,3 +1,4 @@
+{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE TypeOperators #-}
@@ -6,6 +7,131 @@
 {-# LANGUAGE RecordWildCards #-}
 
 module BioInf.RNAfold where
+
+import Data.Vector.Fusion.Stream.Monadic as SM
+import Data.Array.Repa.Index
+import Data.Strict.Tuple
+import qualified Data.Vector.Unboxed as VU
+import Control.Monad.ST
+import Control.Monad
+import Prelude as P
+import System.IO.Unsafe
+import Control.Lens
+
+import Data.Array.Repa.Index.Subword
+import Biobase.Primary
+import ADP.Fusion
+import Biobase.Vienna
+import Biobase.Turner
+import Data.PrimitiveArray as PA hiding ((!))
+import Data.PrimitiveArray.Zero as PA
+import qualified Data.PrimitiveArray as PA
+
+infixl 8 !
+(!) = (PA.!)
+{-# INLINE (!) #-}
+
+
+type Signature m a r =
+  ( Vienna2004 -> (Nuc:!:Nuc) -> Primary -> (Nuc:!:Nuc) -> a
+  , Vienna2004 -> Nuc -> Primary -> Nuc -> a -> Nuc -> Primary -> Nuc -> a
+  , Stream m a -> m r
+  )
+
+gRNAfold ener (hairpin,interior,h) weak inp =
+  ( weak ,
+    hairpin  ener <<< chrR inp % region inp % chrL inp |||
+    interior ener <<< c % r % pr % weak % pl % r % c ... h
+  ) where c = chr inp
+          r = region inp
+          pr = peekRight inp
+          pl = peekLeft  inp
+          {-# INLINE c #-}
+          {-# INLINE r #-}
+          {-# INLINE pr #-}
+          {-# INLINE pl #-}
+          peekRight = Chr -- TODO
+          peekLeft = Chr -- TODO
+{-# INLINE gRNAfold #-}
+
+mfe :: Monad m => Signature m Deka Deka
+mfe = (hairpin,interior,h) where
+  hairpin ener (l:!:lp) xs (rp:!:r)
+      | len <   3 = Deka 888888
+      | len ==  3 = (ener^.hairpinL) VU.! len + tAU + Deka 69696969
+      | len < 31  = (ener^.hairpinL) VU.! len + ener^.hairpinMM!(Z:.l:.r:.lp:.rp) + Deka 498349834983
+      | otherwise = Deka 777777
+      where
+        !len = VU.length xs
+        !tAU  = if (l,r) == (nC,nG) || (l,r) == (nG,nC) then Deka 0 else ener^.termAU
+  interior ener l ls li w ri rs r
+      | lls==0 && lrs==0  -- stack
+      = w + _stack ener ! (Z:.l:.r:.ri:.li) -- left, right, right inner, left inner
+      | lls==1 && lrs==0 || lls==0 && lrs==1  -- stack with slip
+      = w + _stack ener ! (Z:.l:.r:.ri:.li) + _bulgeL ener VU.! 1
+      | lls==1 && lrs==1
+      = w + _iloop1x1 ener ! (Z:.l:.r:.ri:.li:.lH:.rL)
+      | lls==1 && lrs==2
+      = w + _iloop2x1 ener ! (Z:.l:.r:.ri:.li:.lH:.rH:.rL)
+      | lls==2 && lrs==1
+      = w + _iloop2x1 ener ! (Z:.l:.r:.ri:.li:.rH:.lH:.lL)
+      | lls==2 && lrs==2
+      = w + _iloop2x2 ener ! (Z:.l:.r:.r:.li:.lH:.lL:.rH:.rL)
+      | min lls lrs == 2 && max lls lrs == 3
+      = w + _iloop2x3MM ener ! (Z:.l:.r:.lH:.lL) + _iloop2x3MM ener ! (Z:.ri:.li:.rL:.rH) + _iloopL ener VU.! 5 + _ninio ener
+      | lls==0 && lrs > 1 && lrs <= 30
+      = w + tAU + _bulgeL ener VU.! lrs + tUA
+      | lrs==0 && lls > 1 && lls <= 30
+      = w + tAU + _bulgeL ener VU.! lls + tUA
+      | lls==1 && lrs > 2 && lrs <= 30
+      = w + error "TODO: 1xn loops"
+      | lrs==1 && lls > 2 && lls <= 30
+      = w + error "TODO: 1xn loops"
+      | lls+lrs <= 30 -- TODO missing support for length constraints ?
+      = w + error "TODO: general interior loops"
+      | otherwise = huge -- NOTE later on, we should never get this score
+      where
+        !lls = VU.length ls
+        !lrs = VU.length rs
+        !tAU = if (l,r)   `P.elem` [(nC,nG), (nG,nC)] then Deka 0 else ener^.termAU
+        !tUA = if (li,ri) `P.elem` [(nC,nG), (nG,nC)] then Deka 0 else ener^.termAU
+        lH = VU.unsafeHead ls
+        lL = VU.unsafeLast ls
+        rH = VU.unsafeHead rs
+        rL = VU.unsafeLast rs
+  h = foldl' min huge
+  {-# INLINE hairpin #-}
+  {-# INLINE interior #-}
+  {-# INLINE h #-}
+{-# INLINE mfe #-}
+
+huge = Deka 999999
+{-# INLINE huge #-}
+
+rnaFold ener inp = (weak ! (Z:.subword 0 n), bt) where
+  (_,Z:.Subword (_:.n)) = bounds weak
+  len = P.length inp
+  vinp = mkPrimary inp
+  (weak) = unsafePerformIO (rnaFoldFill ener vinp)
+  bt = [] :: [String]
+{-# NOINLINE rnaFold #-}
+
+rnaFoldFill :: Vienna2004 -> Primary -> IO (PA.Unboxed (Z:.Subword) Deka)
+rnaFoldFill !ener !inp = do
+  let n = VU.length inp
+  !weak' <- newWithM (Z:.subword 0 0) (Z:.subword 0 n) huge
+  fillTables $ gRNAfold ener mfe (MTbl NoEmptyT weak') inp
+  (freeze weak')
+{-# NOINLINE rnaFoldFill #-}
+
+fillTables ((MTbl _ weak, weakF)) = do
+  let (_,Z:.Subword (0:.n)) = boundsM weak
+  forM_ [n,n-1..0] $ \i -> forM_ [i..n] $ \j -> do
+    !v <- (weakF $ subword i j)
+    writeM weak (Z:.subword i j) v
+{-# INLINE fillTables #-}
+
+{-
 
 import Control.Monad
 import Control.Monad.Primitive
@@ -341,4 +467,7 @@ fillTables aT aF bT bF cT cF dT dF = do
     cF ij >>= writeM cT ij
     dF ij >>= writeM dT ij
 {-# INLINE fillTables #-}
+
+
+-}
 
