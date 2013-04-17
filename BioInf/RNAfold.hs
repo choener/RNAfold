@@ -33,30 +33,32 @@ infixl 8 !
 
 
 type Signature m a r =
-  ( Vienna2004 -> (Nuc:!:Nuc) -> Primary -> (Nuc:!:Nuc) -> a
+  ( Vienna2004 -> Nuc -> Nuc -> Primary -> Nuc -> Nuc -> a
   , Vienna2004 -> Nuc -> Primary -> Nuc -> a -> Nuc -> Primary -> Nuc -> a
+  , Vienna2004 -> Nuc -> Nuc -> a -> a -> Nuc -> Nuc -> a
   , Stream m a -> m r
   )
 
-gRNAfold ener (hairpin,interior,h) weak inp =
+gRNAfold ener (hairpin,interior,multi,h) weak block comps inp =
   ( weak ,
-    hairpin  ener <<< chrR inp % region inp % chrL inp |||
-    interior ener <<< c % r % pr % weak % pl % r % c ... h
+    hairpin  ener <<< c % pr % sr % pl % c            |||
+    interior ener <<< c % r % pr % weak % pl % r % c  |||
+    multi    ener <<< pl % c % block % comps % c % pr ... h
   ) where c = chr inp
           r = region inp
-          pr = peekRight inp
-          pl = peekLeft  inp
+          pr = peekR inp
+          pl = peekL  inp
+          sr = sregion 3 30 inp
           {-# INLINE c #-}
           {-# INLINE r #-}
           {-# INLINE pr #-}
           {-# INLINE pl #-}
-          peekRight = Chr -- TODO
-          peekLeft = Chr -- TODO
+          {-# INLINE sr #-}
 {-# INLINE gRNAfold #-}
 
 mfe :: Monad m => Signature m Deka Deka
-mfe = (hairpin,interior,h) where
-  hairpin ener (l:!:lp) xs (rp:!:r)
+mfe = (hairpin,interior,multi,h) where
+  hairpin ener l lp xs rp r
       | len <   3 = Deka 888888
       | len ==  3 = (ener^.hairpinL) VU.! len + tAU + Deka 69696969
       | len < 31  = (ener^.hairpinL) VU.! len + ener^.hairpinMM!(Z:.l:.r:.lp:.rp) + Deka 498349834983
@@ -99,9 +101,12 @@ mfe = (hairpin,interior,h) where
         lL = VU.unsafeLast ls
         rH = VU.unsafeHead rs
         rL = VU.unsafeLast rs
+  multi ener lo l b c r ro
+    = huge
   h = foldl' min huge
   {-# INLINE hairpin #-}
   {-# INLINE interior #-}
+  {-# INLINE multi #-}
   {-# INLINE h #-}
 {-# INLINE mfe #-}
 
@@ -112,16 +117,21 @@ rnaFold ener inp = (weak ! (Z:.subword 0 n), bt) where
   (_,Z:.Subword (_:.n)) = bounds weak
   len = P.length inp
   vinp = mkPrimary inp
-  (weak) = unsafePerformIO (rnaFoldFill ener vinp)
+  (weak,block,comps) = unsafePerformIO (rnaFoldFill ener vinp)
   bt = [] :: [String]
 {-# NOINLINE rnaFold #-}
 
-rnaFoldFill :: Vienna2004 -> Primary -> IO (PA.Unboxed (Z:.Subword) Deka)
+rnaFoldFill :: Vienna2004 -> Primary -> IO (PA.Unboxed (Z:.Subword) Deka, PA.Unboxed (Z:.Subword) Deka, PA.Unboxed (Z:.Subword) Deka)
 rnaFoldFill !ener !inp = do
   let n = VU.length inp
-  !weak' <- newWithM (Z:.subword 0 0) (Z:.subword 0 n) huge
-  fillTables $ gRNAfold ener mfe (MTbl NoEmptyT weak') inp
-  (freeze weak')
+  !weak'  <- newWithM (Z:.subword 0 0) (Z:.subword 0 n) huge
+  !block' <- newWithM (Z:.subword 0 0) (Z:.subword 0 n) huge
+  !comps' <- newWithM (Z:.subword 0 0) (Z:.subword 0 n) huge
+  fillTables $ gRNAfold ener mfe (MTbl NoEmptyT weak') (MTbl NoEmptyT block') (MTbl NoEmptyT comps') inp
+  weakF  <- freeze weak'
+  blockF <- freeze block'
+  compsF <- freeze comps'
+  return (weakF,blockF,compsF)
 {-# NOINLINE rnaFoldFill #-}
 
 fillTables ((MTbl _ weak, weakF)) = do
