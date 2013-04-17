@@ -41,8 +41,8 @@ library
     PrimitiveArray >= 0.5     ,
     BiobaseTurner  >= 0.3     ,
     BiobaseVienna  >= 0.3     ,
-    BiobaseXNA     >= 0.7     
---    ADPfusion      >= 0.1.1.0
+    BiobaseXNA     >= 0.7     ,
+    ADPfusion      >= 0.2.0.0
   exposed-modules:
 --    BioInf.RNAfold.GAPlike
     BioInf.RNAfold
@@ -64,31 +64,31 @@ library
 
 
 
---  executable RNAFold
---    build-depends:
---  --    we get all build depends from the library dependencies
---    main-is:
---      RNAFold.hs
---    other-modules:
---  --    BioInf.RNAfold
---  --    BioInf.RNAfold.Combinators
---  --    BioInf.RNAfold.Energy
---  --    BioInf.RNAfold.Library
---    ghc-options:
---      -rtsopts
---      -Odph
---      -funbox-strict-fields
---  --    -fspec-constr
---  --    -fspec-constr-threshold=20
---  --    -fspec-constr-count=10
---      -funfolding-use-threshold100
---      -funfolding-keeness-factor100
---  --    -fsimplifier-phases4
---      -fno-liberate-case
---      -fnew-codegen
---      -fllvm -optlo-O3 -optlo-inline -optlo-std-compile-opts
---  
---  
+executable RNAFold
+  build-depends:
+--    we get all build depends from the library dependencies
+  main-is:
+    RNAFold.hs
+  other-modules:
+--    BioInf.RNAfold
+--    BioInf.RNAfold.Combinators
+--    BioInf.RNAfold.Energy
+--    BioInf.RNAfold.Library
+  ghc-options:
+    -rtsopts
+    -Odph
+    -funbox-strict-fields
+--    -fspec-constr
+--    -fspec-constr-threshold=20
+--    -fspec-constr-count=10
+    -funfolding-use-threshold100
+    -funfolding-keeness-factor100
+--    -fsimplifier-phases4
+--    -fno-liberate-case
+--    -fnew-codegen
+    -fllvm -optlo-O3 -optlo-inline -optlo-std-compile-opts
+
+
 
 source-repository head
   type: git

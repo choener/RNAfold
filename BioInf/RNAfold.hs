@@ -6,6 +6,11 @@
 {-# LANGUAGE NoMonomorphismRestriction #-}
 {-# LANGUAGE RecordWildCards #-}
 
+-- | RNAfold using the 2013 fusion framework.
+--
+-- TODO Split the interior loop calculations into different parts to speed up
+-- calculations.
+
 module BioInf.RNAfold where
 
 import Data.Vector.Fusion.Stream.Monadic as SM
@@ -31,19 +36,49 @@ infixl 8 !
 (!) = (PA.!)
 {-# INLINE (!) #-}
 
+(*.) :: Deka -> Int -> Deka
+(Deka k) *. n = Deka $ k*n
+{-# INLINE (*.) #-}
+
 
 type Signature m a r =
+  -- weak / hairpin
   ( Vienna2004 -> Nuc -> Nuc -> Primary -> Nuc -> Nuc -> a
+  -- weak / interior
   , Vienna2004 -> Nuc -> Primary -> Nuc -> a -> Nuc -> Primary -> Nuc -> a
+  -- weak / multibranch
   , Vienna2004 -> Nuc -> Nuc -> a -> a -> Nuc -> Nuc -> a
+  -- block / multistem
+  , Vienna2004 -> Nuc -> Nuc -> a -> Nuc -> Nuc -> a
+  -- block / unpaired
+  , Vienna2004 -> Nuc -> a -> a
+  -- comps / block region
+  , Vienna2004 -> a -> Primary -> a
+  -- comps / block comps
+  , Vienna2004 -> a -> a -> a
+  -- all / objective
   , Stream m a -> m r
   )
 
-gRNAfold ener (hairpin,interior,multi,h) weak block comps inp =
+-- TODO `with` basepairing
+--
+-- TODO need to fix sized regions, then we are good to go -- performance-wise
+--
+-- TODO backtracking
+--
+-- TODO struct table
+
+gRNAfold ener (hairpin,interior,multi,blockStem,blockUnpair,compsBR,compsBC,h) weak block comps inp =
   ( weak ,
     hairpin  ener <<< c % pr % sr % pl % c            |||
-    interior ener <<< c % r % pr % weak % pl % r % c  |||
-    multi    ener <<< pl % c % block % comps % c % pr ... h
+--    interior ener <<< c % r % pr % weak % pl % r % c  |||
+    multi    ener <<< c % pl % block % comps % pl % c ... h
+  , block ,
+    blockStem   ener <<< pl % c % weak % c % pr |||
+    blockUnpair ener <<< c % block              ... h
+  , comps ,
+    compsBR ener <<< block % r     |||
+    compsBC ener <<< block % comps ... h
   ) where c = chr inp
           r = region inp
           pr = peekR inp
@@ -57,12 +92,12 @@ gRNAfold ener (hairpin,interior,multi,h) weak block comps inp =
 {-# INLINE gRNAfold #-}
 
 mfe :: Monad m => Signature m Deka Deka
-mfe = (hairpin,interior,multi,h) where
+mfe = (hairpin,interior,multi,blockStem,blockUnpair,compsBR,compsBC,h) where
   hairpin ener l lp xs rp r
-      | len <   3 = Deka 888888
-      | len ==  3 = (ener^.hairpinL) VU.! len + tAU + Deka 69696969
-      | len < 31  = (ener^.hairpinL) VU.! len + ener^.hairpinMM!(Z:.l:.r:.lp:.rp) + Deka 498349834983
-      | otherwise = Deka 777777
+      | len <   3 = huge
+      | len ==  3 = (ener^.hairpinL) VU.! len + tAU
+      | len < 31  = (ener^.hairpinL) VU.! len + ener^.hairpinMM!(Z:.l:.r:.lp:.rp)
+      | otherwise = huge
       where
         !len = VU.length xs
         !tAU  = if (l,r) == (nC,nG) || (l,r) == (nG,nC) then Deka 0 else ener^.termAU
@@ -85,12 +120,12 @@ mfe = (hairpin,interior,multi,h) where
       = w + tAU + _bulgeL ener VU.! lrs + tUA
       | lrs==0 && lls > 1 && lls <= 30
       = w + tAU + _bulgeL ener VU.! lls + tUA
-      | lls==1 && lrs > 2 && lrs <= 30
-      = w + error "TODO: 1xn loops"
       | lrs==1 && lls > 2 && lls <= 30
-      = w + error "TODO: 1xn loops"
+      = w + _iloop1xnMM ener ! (Z:.li:.ri:.lL:.rH) + _iloop1xnMM ener ! (Z:.r:.l:.rL:.lH) + _iloopL ener VU.! lls + min (_ninio ener *. (lls-1)) (_maxNinio ener)
+      | lrs==1 && lrs > 2 && lrs <= 30
+      = w + _iloop1xnMM ener ! (Z:.li:.ri:.lL:.rH) + _iloop1xnMM ener ! (Z:.r:.l:.rL:.lH) + _iloopL ener VU.! lrs + min (_ninio ener *. (lrs-1)) (_maxNinio ener)
       | lls+lrs <= 30 -- TODO missing support for length constraints ?
-      = w + error "TODO: general interior loops"
+      = w + _iloopMM ener ! (Z:.l:.r:.lH:.rL) + _iloopMM ener ! (Z:.ri:.li:.rH:.lL) + _iloopL ener VU.! (lls+lrs) + min (_ninio ener *. (abs $ lls - lrs)) (_maxNinio ener)
       | otherwise = huge -- NOTE later on, we should never get this score
       where
         !lls = VU.length ls
@@ -101,12 +136,26 @@ mfe = (hairpin,interior,multi,h) where
         lL = VU.unsafeLast ls
         rH = VU.unsafeHead rs
         rL = VU.unsafeLast rs
-  multi ener lo l b c r ro
-    = huge
+  multi ener l li b c ri r
+    = b + c + _multiMM ener ! (Z:.l:.r:.li:.ri) + _multiHelix ener + _multiOffset ener + tAU where
+        tAU = if (l,r)   `P.elem` [(nC,nG), (nG,nC)] then Deka 0 else ener^.termAU
+  blockStem ener lo l s r ro
+    = s + _multiMM ener ! (Z:.r:.l:.ro:.lo) + _multiHelix ener where
+        tAU = if (l,r)   `P.elem` [(nC,nG), (nG,nC)] then Deka 0 else ener^.termAU
+  blockUnpair ener c b
+    = b + _multiNuc ener
+  compsBR ener b reg
+    = let Deka nuc = _multiNuc ener in b + (Deka $ nuc * (VU.length reg))
+  compsBC ener b c
+    = b + c
   h = foldl' min huge
   {-# INLINE hairpin #-}
   {-# INLINE interior #-}
   {-# INLINE multi #-}
+  {-# INLINE blockStem #-}
+  {-# INLINE blockUnpair #-}
+  {-# INLINE compsBR #-}
+  {-# INLINE compsBC #-}
   {-# INLINE h #-}
 {-# INLINE mfe #-}
 
@@ -134,11 +183,12 @@ rnaFoldFill !ener !inp = do
   return (weakF,blockF,compsF)
 {-# NOINLINE rnaFoldFill #-}
 
-fillTables ((MTbl _ weak, weakF)) = do
+fillTables (MTbl _ weak, weakF, MTbl _ block, blockF, MTbl _ comps, compsF) = do
   let (_,Z:.Subword (0:.n)) = boundsM weak
   forM_ [n,n-1..0] $ \i -> forM_ [i..n] $ \j -> do
-    !v <- (weakF $ subword i j)
-    writeM weak (Z:.subword i j) v
+    weakF (subword i j) >>= writeM weak (Z:.subword i j)
+    blockF (subword i j) >>= writeM block (Z:.subword i j)
+    compsF (subword i j) >>= writeM comps (Z:.subword i j)
 {-# INLINE fillTables #-}
 
 {-
