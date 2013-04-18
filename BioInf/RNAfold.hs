@@ -198,36 +198,23 @@ mfe = (hairpin,interior,multi,blockStem,blockUnpair,compsBR,compsBC,structW,stru
 huge = Deka 999999
 {-# INLINE huge #-}
 
+pretty :: Monad m => Signature m String (SM.Stream m String)
+pretty = (hairpin,interior,multi,blockStem,blockUnpair,compsBR,compsBC,structW,structCS,structWS,structOpen,h) where
+  hairpin     _ _ _ r _ _ = "(" P.++ (P.replicate (VU.length r) '.') P.++ ")"
+  interior    _ _ l _ w _ r _ = "(" P.++ (P.replicate (VU.length l) '.') P.++ w P.++ (P.replicate (VU.length r) '.') P.++ ")"
+  multi       _ _ _ b c _ _ = "(" P.++ b P.++ c P.++ ")"
+  blockStem   _ _ _ w _ _ = w
+  blockUnpair _ _ b = "." P.++ b
+  compsBR     _ b r = b P.++ (P.replicate (VU.length r) '.')
+  compsBC     _ b c = b P.++ c
+  structW     _ w   = w
+  structCS    _ _ w = "." P.++ w
+  structWS    _ w s = w P.++ s
+  structOpen  _ r   = P.replicate (VU.length r) '.'
+  h = return . id
+
 type CombSignature m e b = Signature m (e, m (SM.Stream m b)) (SM.Stream m b)
 
-{-
-type CombSignature m e b =
-  -- weak / hairpin
-  ( Vienna2004 -> Nuc -> Nuc -> Primary -> Nuc -> Nuc -> (e, m (SM.Stream m b))
-  -- weak / interior
-  , Vienna2004 -> Nuc -> Primary -> Nuc -> a -> Nuc -> Primary -> Nuc -> (e, m (SM.Stream m b))
-  -- weak / multibranch
-  ,  -> (e, m (SM.Stream m b))
-  -- block / multistem
-  ,  -> (e, m (SM.Stream m b))
-  -- block / unpaired
-  ,  -> (e, m (SM.Stream m b))
-  -- comps / block region
-  ,  -> (e, m (SM.Stream m b))
-  -- comps / block comps
-  ,  -> (e, m (SM.Stream m b))
-  -- struct / weak
-  ,  -> (e, m (SM.Stream m b))
-  -- struct / char-struct
-  ,  -> (e, m (SM.Stream m b))
-  -- struct / weak-struct
-  ,  -> (e, m (SM.Stream m b))
-  -- struct / open
-  ,  -> (e, m (SM.Stream m b))
-  -- all / objective
-  , SM.Stream m (e, m (SM.Stream m b)) -> m (SM.Stream m b)
-  )
--}
 
 (<**)
   :: (Monad m, Eq b, Eq e) -- , Show e, Show (m [b]))
@@ -245,25 +232,18 @@ type CombSignature m e b =
   hairpin ener l lp xs rp r = (hairpinF ener l lp xs rp r, return $ SM.singleton $ hairpinS ener l lp xs rp r)
   interior ener l ls li (wF,wS) ri rs r = (interiorF ener l ls li wF ri rs r, wS >>>= \w -> interiorS ener l ls li w ri rs r)
   multi ener l li (bF,bS) (cF,cS) ri r = (multiF ener l li bF cF ri r, ccm2 bS cS $ \b c -> multiS ener l li b c ri r)
-  blockStem = undefined
-  blockUnpair = undefined
-  compsBR = undefined
-  compsBC = undefined
-  structW = undefined
-  structCS = undefined
-  structWS = undefined
-  structOpen = undefined
+  blockStem ener lo l (sF,sS) r ro = (blockStemF ener lo l sF r ro, sS >>>= \s -> blockStemS ener lo l s r ro)
+  blockUnpair ener c (bF,bS) = (blockUnpairF ener c bF, bS >>>= \s -> blockUnpairS ener c s)
+  compsBR ener (bF,bS) reg = (compsBRF ener bF reg, bS >>>= \s -> compsBRS ener s reg)
+  compsBC ener (bF,bS) (cF,cS) = (compsBCF ener bF cF, ccm2 bS cS $ \b c -> compsBCS ener b c)
+  structW ener (wF,wS) = (structWF ener wF, wS >>>= \w -> structWs ener w)
+  structCS ener c (wF,wS) = (structCSF ener c wF, wS >>>= \w -> structCSS ener c w)
+  structWS ener (wF,wS) (sF,sS) = (structWSF ener wF sF, ccm2 wS sS $ \w s -> structWSS ener w s)
+  structOpen ener r = (structOpenF ener r, return . SM.singleton $ structOpenS ener r)
   h xs = do
     hfs <- hF $ SM.map P.fst xs
     let phfs = SM.concatMapM P.snd . SM.filter ((hfs==) . P.fst) $ xs
     hS phfs
-  {-
-  empty e         = (emptyF e   , return $ SM.singleton (emptyS e))
-  left b (x,ys)   = (leftF b x  , ys >>= return . SM.map (\y -> leftS b y  ))
-  right  (x,ys) b = (rightF x b , ys >>= return . SM.map (\y -> rightS  y b))
-  pair l (x,ys) r = (pairF l x r, ys >>= return . SM.map (\y -> pairS l y r))
-  split (x,ys) (s,ts) = (splitF x s, ys >>= \ys' -> ts >>= \ts' -> return $ SM.concatMap (\y -> SM.map (\t -> splitS y t) ts') ys')
--}
 
 
 rnaFold ener inp = (struct ! (Z:.subword 0 n), bt) where
