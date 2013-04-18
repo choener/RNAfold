@@ -56,6 +56,14 @@ type Signature m a r =
   , Vienna2004 -> a -> Primary -> a
   -- comps / block comps
   , Vienna2004 -> a -> a -> a
+  -- struct / weak
+  , Vienna2004 -> a -> a
+  -- struct / char-struct
+  , Vienna2004 -> Nuc -> a -> a
+  -- struct / weak-struct
+  , Vienna2004 -> a -> a -> a
+  -- struct / open
+  , Vienna2004 -> Primary -> a
   -- all / objective
   , Stream m a -> m r
   )
@@ -67,11 +75,13 @@ type Signature m a r =
 -- TODO backtracking
 --
 -- TODO struct table
+--
+-- TODO restrict structs to a linear band
 
-gRNAfold ener (hairpin,interior,multi,blockStem,blockUnpair,compsBR,compsBC,h) weak block comps inp =
+gRNAfold ener (hairpin,interior,multi,blockStem,blockUnpair,compsBR,compsBC,structW,structCS,structWS,structOpen,h) weak block comps struct inp =
   ( weak ,
     hairpin  ener <<< c % pr % sr % pl % c            |||
---    interior ener <<< c % r % pr % weak % pl % r % c  |||
+    interior ener <<< c % r % pr % weak % pl % r % c  |||
     multi    ener <<< c % pl % block % comps % pl % c ... h
   , block ,
     blockStem   ener <<< pl % c % weak % c % pr |||
@@ -79,6 +89,11 @@ gRNAfold ener (hairpin,interior,multi,blockStem,blockUnpair,compsBR,compsBC,h) w
   , comps ,
     compsBR ener <<< block % r     |||
     compsBC ener <<< block % comps ... h
+  , struct ,
+    structW ener  <<< weak          |||       -- TODO peak left/right with default
+    structCS ener <<< c % weak      |||
+    structWS ener <<< weak % struct |||       -- peak here for weak, too
+    structOpen ener <<< r           ... h
   ) where c = chr inp
           r = region inp
           pr = peekR inp
@@ -92,7 +107,7 @@ gRNAfold ener (hairpin,interior,multi,blockStem,blockUnpair,compsBR,compsBC,h) w
 {-# INLINE gRNAfold #-}
 
 mfe :: Monad m => Signature m Deka Deka
-mfe = (hairpin,interior,multi,blockStem,blockUnpair,compsBR,compsBC,h) where
+mfe = (hairpin,interior,multi,blockStem,blockUnpair,compsBR,compsBC,structW,structCS,structWS,structOpen,h) where
   hairpin ener l lp xs rp r
       | len <   3 = huge
       | len ==  3 = (ener^.hairpinL) VU.! len + tAU
@@ -148,6 +163,14 @@ mfe = (hairpin,interior,multi,blockStem,blockUnpair,compsBR,compsBC,h) where
     = let Deka nuc = _multiNuc ener in b + (Deka $ nuc * (VU.length reg))
   compsBC ener b c
     = b + c
+  structW ener w
+    = w
+  structCS ener c w
+    = w
+  structWS ener w s
+    = w + s
+  structOpen ener r
+    = 0
   h = foldl' min huge
   {-# INLINE hairpin #-}
   {-# INLINE interior #-}
@@ -156,39 +179,46 @@ mfe = (hairpin,interior,multi,blockStem,blockUnpair,compsBR,compsBC,h) where
   {-# INLINE blockUnpair #-}
   {-# INLINE compsBR #-}
   {-# INLINE compsBC #-}
+  {-# INLINE structW #-}
+  {-# INLINE structCS #-}
+  {-# INLINE structWS #-}
+  {-# INLINE structOpen #-}
   {-# INLINE h #-}
 {-# INLINE mfe #-}
 
 huge = Deka 999999
 {-# INLINE huge #-}
 
-rnaFold ener inp = (weak ! (Z:.subword 0 n), bt) where
+rnaFold ener inp = (struct ! (Z:.subword 0 n), bt) where
   (_,Z:.Subword (_:.n)) = bounds weak
   len = P.length inp
   vinp = mkPrimary inp
-  (weak,block,comps) = unsafePerformIO (rnaFoldFill ener vinp)
+  (weak,block,comps,struct) = unsafePerformIO (rnaFoldFill ener vinp)
   bt = [] :: [String]
 {-# NOINLINE rnaFold #-}
 
-rnaFoldFill :: Vienna2004 -> Primary -> IO (PA.Unboxed (Z:.Subword) Deka, PA.Unboxed (Z:.Subword) Deka, PA.Unboxed (Z:.Subword) Deka)
+rnaFoldFill :: Vienna2004 -> Primary -> IO (PA.Unboxed (Z:.Subword) Deka, PA.Unboxed (Z:.Subword) Deka, PA.Unboxed (Z:.Subword) Deka, PA.Unboxed (Z:.Subword) Deka)
 rnaFoldFill !ener !inp = do
   let n = VU.length inp
   !weak'  <- newWithM (Z:.subword 0 0) (Z:.subword 0 n) huge
   !block' <- newWithM (Z:.subword 0 0) (Z:.subword 0 n) huge
   !comps' <- newWithM (Z:.subword 0 0) (Z:.subword 0 n) huge
-  fillTables $ gRNAfold ener mfe (MTbl NoEmptyT weak') (MTbl NoEmptyT block') (MTbl NoEmptyT comps') inp
+  !struc' <- newWithM (Z:.subword 0 0) (Z:.subword 0 n) huge
+  fillTables $ gRNAfold ener mfe (MTbl NoEmptyT weak') (MTbl NoEmptyT block') (MTbl NoEmptyT comps') (MTbl NoEmptyT struc') inp
   weakF  <- freeze weak'
   blockF <- freeze block'
   compsF <- freeze comps'
-  return (weakF,blockF,compsF)
+  strucF <- freeze struc'
+  return (weakF,blockF,compsF,strucF)
 {-# NOINLINE rnaFoldFill #-}
 
-fillTables (MTbl _ weak, weakF, MTbl _ block, blockF, MTbl _ comps, compsF) = do
+fillTables (MTbl _ weak, weakF, MTbl _ block, blockF, MTbl _ comps, compsF, MTbl _ struc, strucF) = do
   let (_,Z:.Subword (0:.n)) = boundsM weak
   forM_ [n,n-1..0] $ \i -> forM_ [i..n] $ \j -> do
     weakF (subword i j) >>= writeM weak (Z:.subword i j)
     blockF (subword i j) >>= writeM block (Z:.subword i j)
     compsF (subword i j) >>= writeM comps (Z:.subword i j)
+    strucF (subword i j) >>= writeM struc (Z:.subword i j)
 {-# INLINE fillTables #-}
 
 {-
