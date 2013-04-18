@@ -68,8 +68,17 @@ type Signature m a r =
   , Stream m a -> m r
   )
 
--- TODO `with` basepairing
---
+basepairing :: Primary -> Subword -> Bool
+basepairing inp (Subword(i:.j)) = f (inp VU.! i) (inp VU.! (j-1)) where
+  f l r =  l==nC && r==nG
+        || l==nG && r==nC
+        || l==nA && r==nU
+        || l==nU && r==nA
+        || l==nG && r==nU
+        || l==nU && r==nG
+  {-# INLINE f #-}
+{-# INLINE basepairing #-}
+
 -- TODO need to fix sized regions, then we are good to go -- performance-wise
 --
 -- TODO backtracking
@@ -82,7 +91,7 @@ gRNAfold ener (hairpin,interior,multi,blockStem,blockUnpair,compsBR,compsBC,stru
   ( weak ,
     hairpin  ener <<< c % pr % sr % pl % c            |||
     interior ener <<< c % r % pr % weak % pl % r % c  |||
-    multi    ener <<< c % pl % block % comps % pl % c ... h
+    multi    ener <<< c % pl % block % comps % pl % c `check` (basepairing inp) ... h
   , block ,
     blockStem   ener <<< pl % c % weak % c % pr |||
     blockUnpair ener <<< c % block              ... h
@@ -188,6 +197,74 @@ mfe = (hairpin,interior,multi,blockStem,blockUnpair,compsBR,compsBC,structW,stru
 
 huge = Deka 999999
 {-# INLINE huge #-}
+
+type CombSignature m e b = Signature m (e, m (SM.Stream m b)) (SM.Stream m b)
+
+{-
+type CombSignature m e b =
+  -- weak / hairpin
+  ( Vienna2004 -> Nuc -> Nuc -> Primary -> Nuc -> Nuc -> (e, m (SM.Stream m b))
+  -- weak / interior
+  , Vienna2004 -> Nuc -> Primary -> Nuc -> a -> Nuc -> Primary -> Nuc -> (e, m (SM.Stream m b))
+  -- weak / multibranch
+  ,  -> (e, m (SM.Stream m b))
+  -- block / multistem
+  ,  -> (e, m (SM.Stream m b))
+  -- block / unpaired
+  ,  -> (e, m (SM.Stream m b))
+  -- comps / block region
+  ,  -> (e, m (SM.Stream m b))
+  -- comps / block comps
+  ,  -> (e, m (SM.Stream m b))
+  -- struct / weak
+  ,  -> (e, m (SM.Stream m b))
+  -- struct / char-struct
+  ,  -> (e, m (SM.Stream m b))
+  -- struct / weak-struct
+  ,  -> (e, m (SM.Stream m b))
+  -- struct / open
+  ,  -> (e, m (SM.Stream m b))
+  -- all / objective
+  , SM.Stream m (e, m (SM.Stream m b)) -> m (SM.Stream m b)
+  )
+-}
+
+(<**)
+  :: (Monad m, Eq b, Eq e) -- , Show e, Show (m [b]))
+  => Vienna2004
+  -> Signature m e e
+  -> Signature m b (SM.Stream m b)
+  -> CombSignature m e b
+(<**) ener f s = (hairpin,interior,multi,blockStem,blockUnpair,compsBR,compsBC,structW,structCS,structWS,structOpen,h) where
+  (hairpinF,interiorF,multiF,blockStemF,blockUnpairF,compsBRF,compsBCF,structWF,structCSF,structWSF,structOpenF,hF) = f
+  (hairpinS,interiorS,multiS,blockStemS,blockUnpairS,compsBRS,compsBCS,structWs,structCSS,structWSS,structOpenS,hS) = s
+  
+  xs >>>= f = xs >>= return . SM.map f
+  ccm2 xs ys f = xs >>= \xx -> ys >>= \yy -> return $ SM.concatMap (\x -> SM.map (\y -> f x y) yy) xx
+
+  hairpin ener l lp xs rp r = (hairpinF ener l lp xs rp r, return $ SM.singleton $ hairpinS ener l lp xs rp r)
+  interior ener l ls li (wF,wS) ri rs r = (interiorF ener l ls li wF ri rs r, wS >>>= \w -> interiorS ener l ls li w ri rs r)
+  multi ener l li (bF,bS) (cF,cS) ri r = (multiF ener l li bF cF ri r, ccm2 bS cS $ \b c -> multiS ener l li b c ri r)
+  blockStem = undefined
+  blockUnpair = undefined
+  compsBR = undefined
+  compsBC = undefined
+  structW = undefined
+  structCS = undefined
+  structWS = undefined
+  structOpen = undefined
+  h xs = do
+    hfs <- hF $ SM.map P.fst xs
+    let phfs = SM.concatMapM P.snd . SM.filter ((hfs==) . P.fst) $ xs
+    hS phfs
+  {-
+  empty e         = (emptyF e   , return $ SM.singleton (emptyS e))
+  left b (x,ys)   = (leftF b x  , ys >>= return . SM.map (\y -> leftS b y  ))
+  right  (x,ys) b = (rightF x b , ys >>= return . SM.map (\y -> rightS  y b))
+  pair l (x,ys) r = (pairF l x r, ys >>= return . SM.map (\y -> pairS l y r))
+  split (x,ys) (s,ts) = (splitF x s, ys >>= \ys' -> ts >>= \ts' -> return $ SM.concatMap (\y -> SM.map (\t -> splitS y t) ts') ys')
+-}
+
 
 rnaFold ener inp = (struct ! (Z:.subword 0 n), bt) where
   (_,Z:.Subword (_:.n)) = bounds weak
