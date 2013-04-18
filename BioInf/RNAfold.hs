@@ -14,6 +14,7 @@
 module BioInf.RNAfold where
 
 import Data.Vector.Fusion.Stream.Monadic as SM
+import Data.Vector.Fusion.Util (Id (..))
 import Data.Array.Repa.Index
 import Data.Strict.Tuple
 import qualified Data.Vector.Unboxed as VU
@@ -69,7 +70,7 @@ type Signature m a r =
   )
 
 basepairing :: Primary -> Subword -> Bool
-basepairing inp (Subword(i:.j)) = f (inp VU.! i) (inp VU.! (j-1)) where
+basepairing inp (Subword(i:.j)) = i+1<j && f (inp VU.! i) (inp VU.! (j-1)) where
   f l r =  l==nC && r==nG
         || l==nG && r==nC
         || l==nA && r==nU
@@ -218,11 +219,10 @@ type CombSignature m e b = Signature m (e, m (SM.Stream m b)) (SM.Stream m b)
 
 (<**)
   :: (Monad m, Eq b, Eq e) -- , Show e, Show (m [b]))
-  => Vienna2004
-  -> Signature m e e
+  => Signature m e e
   -> Signature m b (SM.Stream m b)
   -> CombSignature m e b
-(<**) ener f s = (hairpin,interior,multi,blockStem,blockUnpair,compsBR,compsBC,structW,structCS,structWS,structOpen,h) where
+(<**) f s = (hairpin,interior,multi,blockStem,blockUnpair,compsBR,compsBC,structW,structCS,structWS,structOpen,h) where
   (hairpinF,interiorF,multiF,blockStemF,blockUnpairF,compsBRF,compsBCF,structWF,structCSF,structWSF,structOpenF,hF) = f
   (hairpinS,interiorS,multiS,blockStemS,blockUnpairS,compsBRS,compsBCS,structWs,structCSS,structWSS,structOpenS,hS) = s
   
@@ -251,7 +251,7 @@ rnaFold ener inp = (struct ! (Z:.subword 0 n), bt) where
   len = P.length inp
   vinp = mkPrimary inp
   (weak,block,comps,struct) = unsafePerformIO (rnaFoldFill ener vinp)
-  bt = [] :: [String]
+  bt = backtrack ener vinp (weak,block,comps,struct)
 {-# NOINLINE rnaFold #-}
 
 rnaFoldFill :: Vienna2004 -> Primary -> IO (PA.Unboxed (Z:.Subword) Deka, PA.Unboxed (Z:.Subword) Deka, PA.Unboxed (Z:.Subword) Deka, PA.Unboxed (Z:.Subword) Deka)
@@ -277,6 +277,17 @@ fillTables (MTbl _ weak, weakF, MTbl _ block, blockF, MTbl _ comps, compsF, MTbl
     compsF (subword i j) >>= writeM comps (Z:.subword i j)
     strucF (subword i j) >>= writeM struc (Z:.subword i j)
 {-# INLINE fillTables #-}
+
+-- * backtracking
+
+backtrack ener (inp :: Primary) (weak :: PA.Unboxed (Z:.Subword) Deka, block :: PA.Unboxed (Z:.Subword) Deka, comps :: PA.Unboxed (Z:.Subword) Deka, struct :: PA.Unboxed (Z:.Subword) Deka) = unId . SM.toList . unId $ sF $ subword 0 n where
+  n = VU.length inp
+  w = BtTbl EmptyT weak   (wF :: Subword -> Id (SM.Stream Id String))
+  b = BtTbl EmptyT block  (bF :: Subword -> Id (SM.Stream Id String))
+  c = BtTbl EmptyT comps  (cF :: Subword -> Id (SM.Stream Id String))
+  s = BtTbl EmptyT struct (sF :: Subword -> Id (SM.Stream Id String))
+  (_,wF,_,bF,_,cF,_,sF) = gRNAfold ener (mfe <** pretty) w b c s inp
+{-# INLINE backtrack #-}
 
 {-
 
