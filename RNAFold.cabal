@@ -41,8 +41,8 @@ library
     PrimitiveArray >= 0.5     ,
     BiobaseTurner  >= 0.3     ,
     BiobaseVienna  >= 0.3     ,
-    BiobaseXNA     >= 0.7     
---    ADPfusion      >= 0.2.0.0
+    BiobaseXNA     >= 0.7     ,
+    ADPfusion      >= 0.2.0.0
   exposed-modules:
 --    BioInf.RNAfold.GAPlike
     BioInf.RNAfold
