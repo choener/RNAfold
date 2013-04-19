@@ -33,6 +33,9 @@ import Data.PrimitiveArray as PA hiding ((!))
 import Data.PrimitiveArray.Zero as PA
 import qualified Data.PrimitiveArray as PA
 
+import Debug.Trace
+
+
 infixl 8 !
 (!) = (PA.!)
 {-# INLINE (!) #-}
@@ -100,7 +103,7 @@ gRNAfold ener (hairpin,interior,multi,blockStem,blockUnpair,compsBR,compsBC,stru
     compsBR ener <<< block % r     |||
     compsBC ener <<< block % comps ... h
   , struct ,
-    structW ener  <<< weak          |||       -- TODO peak left/right with default
+--    structW ener  <<< weak          |||       -- TODO peak left/right with default ; not needed anymore
     structCS ener <<< c % weak      |||
     structWS ener <<< weak % struct |||       -- peak here for weak, too
     structOpen ener <<< r           ... h
@@ -260,7 +263,7 @@ rnaFoldFill !ener !inp = do
   !weak'  <- newWithM (Z:.subword 0 0) (Z:.subword 0 n) huge
   !block' <- newWithM (Z:.subword 0 0) (Z:.subword 0 n) huge
   !comps' <- newWithM (Z:.subword 0 0) (Z:.subword 0 n) huge
-  !struc' <- newWithM (Z:.subword 0 0) (Z:.subword 0 n) huge
+  !struc' <- newWithM (Z:.subword 0 0) (Z:.subword 0 n) (Deka 0)
   fillTables $ gRNAfold ener mfe (MTbl NoEmptyT weak') (MTbl NoEmptyT block') (MTbl NoEmptyT comps') (MTbl NoEmptyT struc') inp
   weakF  <- freeze weak'
   blockF <- freeze block'
@@ -282,9 +285,9 @@ fillTables (MTbl _ weak, weakF, MTbl _ block, blockF, MTbl _ comps, compsF, MTbl
 
 backtrack ener (inp :: Primary) (weak :: PA.Unboxed (Z:.Subword) Deka, block :: PA.Unboxed (Z:.Subword) Deka, comps :: PA.Unboxed (Z:.Subword) Deka, struct :: PA.Unboxed (Z:.Subword) Deka) = unId . SM.toList . unId $ sF $ subword 0 n where
   n = VU.length inp
-  w = BtTbl EmptyT weak   (wF :: Subword -> Id (SM.Stream Id String))
-  b = BtTbl EmptyT block  (bF :: Subword -> Id (SM.Stream Id String))
-  c = BtTbl EmptyT comps  (cF :: Subword -> Id (SM.Stream Id String))
+  w = BtTbl NoEmptyT weak   (wF :: Subword -> Id (SM.Stream Id String))
+  b = BtTbl NoEmptyT block  (bF :: Subword -> Id (SM.Stream Id String))
+  c = BtTbl NoEmptyT comps  (cF :: Subword -> Id (SM.Stream Id String))
   s = BtTbl EmptyT struct (sF :: Subword -> Id (SM.Stream Id String))
   (_,wF,_,bF,_,cF,_,sF) = gRNAfold ener (mfe <** pretty) w b c s inp
 {-# INLINE backtrack #-}
