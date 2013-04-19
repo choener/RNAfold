@@ -27,6 +27,7 @@ import Control.Lens
 
 import Data.Array.Repa.Index.Subword
 import Biobase.Primary
+import Biobase.Secondary.Diagrams
 import ADP.Fusion
 import Biobase.Vienna
 import Biobase.Turner
@@ -254,6 +255,16 @@ type CombSignature m e b = Signature m (e, m (SM.Stream m b)) (SM.Stream m b)
     let phfs = SM.concatMapM P.snd . SM.filter ((hfs==) . P.fst) $ xs
     hS phfs
 
+
+
+rnaEval ener inp str = (struct ! (Z:.subword 0 n), bt) where
+  (_,Z:.Subword (_:.n)) = bounds weak
+  len = P.length inp
+  vinp = mkPrimary inp
+  s = VU.fromList . P.map (P.uncurry subword) $ dotBracket ["()"] str
+  (weak,block,comps,struct) = unsafePerformIO (rnaFoldFill ener (Just s) vinp)
+  bt = backtrack ener (Just s) vinp (weak,block,comps,struct)
+{-# NOINLINE rnaEval #-}
 
 rnaFold ener inp = (struct ! (Z:.subword 0 n), bt) where
   (_,Z:.Subword (_:.n)) = bounds weak
