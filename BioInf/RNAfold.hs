@@ -100,8 +100,8 @@ structureConstrains (Just cs) (Subword (i:.j)) = subword i (j-1) `VU.elem` cs
 
 gRNAfold ener (hairpin,interior,multi,blockStem,blockUnpair,compsBR,compsBC,structW,structCS,structWS,structOpen,h) weak block comps struct cs inp =
   ( weak ,
-    hairpin  ener <<< c % pr % sr % pl % c            |||
-    interior ener <<< c % r % pr % weak % pl % r % c  |||
+    hairpin  ener <<< c % pr % hr % pl % c             |||
+    interior ener <<< c % ir % pr % weak % pl % ir % c |||
     multi    ener <<< c % pl % block % comps % pl % c `check` (basepairing inp) `check` (structureConstrains cs) ... h
   , block ,
     blockStem   ener <<< pl % c % weak % c % pr |||
@@ -118,12 +118,14 @@ gRNAfold ener (hairpin,interior,multi,blockStem,blockUnpair,compsBR,compsBC,stru
           r = region inp
           pr = peekR inp
           pl = peekL  inp
-          sr = sregion 3 30 inp
+          hr = sregion 3 30 inp
+          ir = sregion 0 20 inp
           {-# INLINE c #-}
           {-# INLINE r #-}
           {-# INLINE pr #-}
           {-# INLINE pl #-}
-          {-# INLINE sr #-}
+          {-# INLINE hr #-}
+          {-# INLINE ir #-}
 {-# INLINE gRNAfold #-}
 
 mfe :: Monad m => Signature m Deka Deka
@@ -157,9 +159,9 @@ mfe = (hairpin,interior,multi,blockStem,blockUnpair,compsBR,compsBC,structW,stru
       = w + tAU + _bulgeL ener VU.! lls + tUA
       | lrs==1 && lls > 2 && lls <= 30
       = w + _iloop1xnMM ener ! (Z:.li:.ri:.lL:.rH) + _iloop1xnMM ener ! (Z:.r:.l:.rL:.lH) + _iloopL ener VU.! lls + min (_ninio ener *. (lls-1)) (_maxNinio ener)
-      | lrs==1 && lrs > 2 && lrs <= 30
+      | lls==1 && lrs > 2 && lrs <= 30
       = w + _iloop1xnMM ener ! (Z:.li:.ri:.lL:.rH) + _iloop1xnMM ener ! (Z:.r:.l:.rL:.lH) + _iloopL ener VU.! lrs + min (_ninio ener *. (lrs-1)) (_maxNinio ener)
-      | lls+lrs <= 30 -- TODO missing support for length constraints ?
+      | lls>0 && lrs>0 && lls+lrs <= 30 -- TODO missing support for length constraints ?
       = w + _iloopMM ener ! (Z:.l:.r:.lH:.rL) + _iloopMM ener ! (Z:.ri:.li:.rH:.lL) + _iloopL ener VU.! (lls+lrs) + min (_ninio ener *. (abs $ lls - lrs)) (_maxNinio ener)
       | otherwise = huge -- NOTE later on, we should never get this score
       where
