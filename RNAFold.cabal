@@ -50,17 +50,17 @@ library
 --    BioInf.RNAfold.Energy
 --    BioInf.RNAfold.Library
   ghc-options:
---    -O2
---    -funbox-strict-fields
+    -Odph
+    -funbox-strict-fields
 --    -fspec-constr
 --    -fspec-constr-threshold=500
 --    -fspec-constr-count=10
---    -funfolding-use-threshold100
---    -funfolding-keeness-factor100
+    -funfolding-use-threshold100
+    -funfolding-keeness-factor100
 --    -fsimplifier-phases10
---  if flag (llvm)
---    ghc-options:
---      -fllvm -optlo-O3 -optlo-inline -optlo-std-compile-opts
+--    -fno-liberate-case
+--    -fnew-codegen
+    -fllvm -optlo-O3 -optlo-inline -optlo-std-compile-opts
 
 
 
