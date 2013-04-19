@@ -17,10 +17,11 @@ import Data.Vector.Fusion.Stream.Monadic as SM
 import Data.Vector.Fusion.Util (Id (..))
 import Data.Array.Repa.Index
 import Data.Strict.Tuple
+import Data.Strict.Maybe
 import qualified Data.Vector.Unboxed as VU
 import Control.Monad.ST
 import Control.Monad
-import Prelude as P
+import Prelude as P hiding (Maybe(..))
 import System.IO.Unsafe
 import Control.Lens
 
@@ -83,6 +84,11 @@ basepairing inp (Subword(i:.j)) = i+1<j && f (inp VU.! i) (inp VU.! (j-1)) where
   {-# INLINE f #-}
 {-# INLINE basepairing #-}
 
+structureConstrains :: Maybe (VU.Vector Subword) -> Subword -> Bool
+structureConstrains Nothing   _  = True
+structureConstrains (Just cs) sw = sw `VU.elem` cs
+{-# INLINE structureConstrains #-}
+
 -- TODO need to fix sized regions, then we are good to go -- performance-wise
 --
 -- TODO backtracking
@@ -91,11 +97,11 @@ basepairing inp (Subword(i:.j)) = i+1<j && f (inp VU.! i) (inp VU.! (j-1)) where
 --
 -- TODO restrict structs to a linear band
 
-gRNAfold ener (hairpin,interior,multi,blockStem,blockUnpair,compsBR,compsBC,structW,structCS,structWS,structOpen,h) weak block comps struct inp =
+gRNAfold ener (hairpin,interior,multi,blockStem,blockUnpair,compsBR,compsBC,structW,structCS,structWS,structOpen,h) weak block comps struct cs inp =
   ( weak ,
     hairpin  ener <<< c % pr % sr % pl % c            |||
     interior ener <<< c % r % pr % weak % pl % r % c  |||
-    multi    ener <<< c % pl % block % comps % pl % c `check` (basepairing inp) ... h
+    multi    ener <<< c % pl % block % comps % pl % c `check` (basepairing inp) `check` (structureConstrains cs) ... h
   , block ,
     blockStem   ener <<< pl % c % weak % c % pr |||
     blockUnpair ener <<< c % block              ... h
@@ -253,18 +259,18 @@ rnaFold ener inp = (struct ! (Z:.subword 0 n), bt) where
   (_,Z:.Subword (_:.n)) = bounds weak
   len = P.length inp
   vinp = mkPrimary inp
-  (weak,block,comps,struct) = unsafePerformIO (rnaFoldFill ener vinp)
-  bt = backtrack ener vinp (weak,block,comps,struct)
+  (weak,block,comps,struct) = unsafePerformIO (rnaFoldFill ener Nothing vinp)
+  bt = backtrack ener Nothing vinp (weak,block,comps,struct)
 {-# NOINLINE rnaFold #-}
 
-rnaFoldFill :: Vienna2004 -> Primary -> IO (PA.Unboxed (Z:.Subword) Deka, PA.Unboxed (Z:.Subword) Deka, PA.Unboxed (Z:.Subword) Deka, PA.Unboxed (Z:.Subword) Deka)
-rnaFoldFill !ener !inp = do
+rnaFoldFill :: Vienna2004 -> Maybe (VU.Vector Subword) -> Primary -> IO (PA.Unboxed (Z:.Subword) Deka, PA.Unboxed (Z:.Subword) Deka, PA.Unboxed (Z:.Subword) Deka, PA.Unboxed (Z:.Subword) Deka)
+rnaFoldFill !ener !cs !inp = do
   let n = VU.length inp
   !weak'  <- newWithM (Z:.subword 0 0) (Z:.subword 0 n) huge
   !block' <- newWithM (Z:.subword 0 0) (Z:.subword 0 n) huge
   !comps' <- newWithM (Z:.subword 0 0) (Z:.subword 0 n) huge
   !struc' <- newWithM (Z:.subword 0 0) (Z:.subword 0 n) (Deka 0)
-  fillTables $ gRNAfold ener mfe (MTbl NoEmptyT weak') (MTbl NoEmptyT block') (MTbl NoEmptyT comps') (MTbl NoEmptyT struc') inp
+  fillTables $ gRNAfold ener mfe (MTbl NoEmptyT weak') (MTbl NoEmptyT block') (MTbl NoEmptyT comps') (MTbl NoEmptyT struc') cs inp
   weakF  <- freeze weak'
   blockF <- freeze block'
   compsF <- freeze comps'
@@ -283,13 +289,13 @@ fillTables (MTbl _ weak, weakF, MTbl _ block, blockF, MTbl _ comps, compsF, MTbl
 
 -- * backtracking
 
-backtrack ener (inp :: Primary) (weak :: PA.Unboxed (Z:.Subword) Deka, block :: PA.Unboxed (Z:.Subword) Deka, comps :: PA.Unboxed (Z:.Subword) Deka, struct :: PA.Unboxed (Z:.Subword) Deka) = unId . SM.toList . unId $ sF $ subword 0 n where
+backtrack ener cs (inp :: Primary) (weak :: PA.Unboxed (Z:.Subword) Deka, block :: PA.Unboxed (Z:.Subword) Deka, comps :: PA.Unboxed (Z:.Subword) Deka, struct :: PA.Unboxed (Z:.Subword) Deka) = unId . SM.toList . unId $ sF $ subword 0 n where
   n = VU.length inp
   w = BtTbl NoEmptyT weak   (wF :: Subword -> Id (SM.Stream Id String))
   b = BtTbl NoEmptyT block  (bF :: Subword -> Id (SM.Stream Id String))
   c = BtTbl NoEmptyT comps  (cF :: Subword -> Id (SM.Stream Id String))
   s = BtTbl EmptyT struct (sF :: Subword -> Id (SM.Stream Id String))
-  (_,wF,_,bF,_,cF,_,sF) = gRNAfold ener (mfe <** pretty) w b c s inp
+  (_,wF,_,bF,_,cF,_,sF) = gRNAfold ener (mfe <** pretty) w b c s cs inp
 {-# INLINE backtrack #-}
 
 {-
