@@ -87,7 +87,7 @@ basepairing inp (Subword(i:.j)) = i+1<j && f (inp VU.! i) (inp VU.! (j-1)) where
 
 structureConstrains :: Maybe (VU.Vector Subword) -> Subword -> Bool
 structureConstrains Nothing   _  = True
-structureConstrains (Just cs) sw = sw `VU.elem` cs
+structureConstrains (Just cs) (Subword (i:.j)) = subword i (j-1) `VU.elem` cs
 {-# INLINE structureConstrains #-}
 
 -- TODO need to fix sized regions, then we are good to go -- performance-wise
