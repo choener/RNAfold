@@ -90,6 +90,10 @@ structureConstrains Nothing   _  = True
 structureConstrains (Just cs) (Subword (i:.j)) = subword i (j-1) `VU.elem` cs
 {-# INLINE structureConstrains #-}
 
+structC :: Primary -> Subword -> Bool
+structC inp (Subword(i:.j)) = VU.length inp == j
+{-# INLINE structC #-}
+
 -- TODO need to fix sized regions, then we are good to go -- performance-wise
 --
 -- TODO backtracking
@@ -110,10 +114,10 @@ gRNAfold ener (hairpin,interior,multi,blockStem,blockUnpair,compsBR,compsBC,stru
     compsBR ener <<< block % r     |||
     compsBC ener <<< block % comps ... h
   , struct ,
---    structW ener  <<< weak          |||       -- TODO peak left/right with default ; not needed anymore
-    structCS ener <<< c % weak      |||
+--    structW  ener <<< weak          |||       -- TODO peak left/right with default ; not needed anymore
+    structCS ener <<< c % struct    |||
     structWS ener <<< weak % struct |||       -- peak here for weak, too
-    structOpen ener <<< r           ... h
+    structOpen ener <<< r           `check` (structC inp) ... h
   ) where c = chr inp
           r = region inp
           pr = peekR inp
@@ -127,6 +131,14 @@ gRNAfold ener (hairpin,interior,multi,blockStem,blockUnpair,compsBR,compsBC,stru
           {-# INLINE hr #-}
           {-# INLINE ir #-}
 {-# INLINE gRNAfold #-}
+
+{-
+mfeEval :: Monad m => Signature m Deka Deka
+mfeEval = (hairpin,interior,multi,blockStem,blockUnpair,compsBR,compsBC,structW,structCS,structWS,structOpen,h) where
+  (hairpin,interior,multi,blockStem,blockUnpair,compsBR,compsBC,structW,structCS,structWS,_,h) = mfe
+  structOpen ener r
+    = huge
+-}
 
 mfe :: Monad m => Signature m Deka Deka
 mfe = (hairpin,interior,multi,blockStem,blockUnpair,compsBR,compsBC,structW,structCS,structWS,structOpen,h) where
@@ -282,7 +294,7 @@ rnaFoldFill !ener !cs !inp = do
   !weak'  <- newWithM (Z:.subword 0 0) (Z:.subword 0 n) huge
   !block' <- newWithM (Z:.subword 0 0) (Z:.subword 0 n) huge
   !comps' <- newWithM (Z:.subword 0 0) (Z:.subword 0 n) huge
-  !struc' <- newWithM (Z:.subword 0 0) (Z:.subword 0 n) (Deka 0)
+  !struc' <- newWithM (Z:.subword 0 0) (Z:.subword 0 n) 0
   fillTables $ gRNAfold ener mfe (MTbl NoEmptyT weak') (MTbl NoEmptyT block') (MTbl NoEmptyT comps') (MTbl NoEmptyT struc') cs inp
   weakF  <- freeze weak'
   blockF <- freeze block'
@@ -307,7 +319,7 @@ backtrack ener cs (inp :: Primary) (weak :: PA.Unboxed (Z:.Subword) Deka, block 
   w = BtTbl NoEmptyT weak   (wF :: Subword -> Id (SM.Stream Id String))
   b = BtTbl NoEmptyT block  (bF :: Subword -> Id (SM.Stream Id String))
   c = BtTbl NoEmptyT comps  (cF :: Subword -> Id (SM.Stream Id String))
-  s = BtTbl EmptyT struct (sF :: Subword -> Id (SM.Stream Id String))
+  s = BtTbl NoEmptyT struct (sF :: Subword -> Id (SM.Stream Id String))
   (_,wF,_,bF,_,cF,_,sF) = gRNAfold ener (mfe <** pretty) w b c s cs inp
 {-# INLINE backtrack #-}
 

@@ -26,6 +26,34 @@ run' tm (inp,str) = do
   print $ length inp
   print $ rnaEval tm inp str
 
+tests = mapM_ (uncurry test)
+  [ ( "CCUGACUGGCGUUGACAUAUGGUU"
+    , ".......(((((......)).)))"
+    )
+  , ( "CUGGGGGUGACAUCCCCCC"
+    , "..(((((......)).)))"
+    )
+  , ( "GGCGUUGACAUAUGGUU"
+    , "(((((......)).)))"
+    )
+  , ( "GGGGUUGACAUACCCCC"
+    , "(((((......)).)))"
+    )
+  , ( "GGCGUUGACAUAUGUU"
+    , "(((((......)))))"
+    )
+  , ( "GGGGGUGACAUCCCCC"
+    , "(((((......)))))"
+    )
+  , ( "GGGGGUGACCCCC"
+    , "(((((...)))))"
+    )
+  , ( "CCUGACUGGCGUUGACAUAUGGUUGCUUGAGCGUAGCCAGGUGUUGGUGGUCCAGUGCAUCAAGGUGCCGUCGGAUCGGAUACUUGGCUUUGCUUAGAUU"
+    , ".......(((((......)).)))(.(((((((.(((((((.(((((((.....((((......)))))))).)))......))))))).))))))).)."
+    )
+  ]
+
+
 {-
 doRNAfold inp = do
   let (e,bs) = testRNAfold inp
