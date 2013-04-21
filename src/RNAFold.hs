@@ -9,9 +9,10 @@ module Main where
 
 import System.Console.CmdArgs
 
+import Biobase.Primary
+import Biobase.Vienna
 import BioInf.RNAfold
 import qualified Biobase.Turner.Import as TI
-import Biobase.Vienna
 
 
 
@@ -31,5 +32,5 @@ main = do
 
 run' tm inp = do
   print $ length inp
-  print $ rnaFold tm inp
+  print $ rnaFold tm (mkPrimary inp)
 

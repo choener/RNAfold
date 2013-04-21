@@ -13,24 +13,24 @@
 
 module BioInf.RNAfold where
 
+import Control.Lens
+import Control.Monad
+import Control.Monad.ST
+import Data.Array.Repa.Index
+import Data.Strict.Maybe
+import Data.Strict.Tuple
 import Data.Vector.Fusion.Stream.Monadic as SM
 import Data.Vector.Fusion.Util (Id (..))
-import Data.Array.Repa.Index
-import Data.Strict.Tuple
-import Data.Strict.Maybe
-import qualified Data.Vector.Unboxed as VU
-import Control.Monad.ST
-import Control.Monad
 import Prelude as P hiding (Maybe(..))
+import qualified Data.Vector.Unboxed as VU
 import System.IO.Unsafe
-import Control.Lens
 
-import Data.Array.Repa.Index.Subword
+import ADP.Fusion
 import Biobase.Primary
 import Biobase.Secondary.Diagrams
-import ADP.Fusion
-import Biobase.Vienna
 import Biobase.Turner
+import Biobase.Vienna
+import Data.Array.Repa.Index.Subword
 import Data.PrimitiveArray as PA hiding ((!))
 import Data.PrimitiveArray.Zero as PA
 import qualified Data.PrimitiveArray as PA
@@ -85,9 +85,9 @@ basepairing inp (Subword(i:.j)) = i+1<j && f (inp VU.! i) (inp VU.! (j-1)) where
   {-# INLINE f #-}
 {-# INLINE basepairing #-}
 
-structureConstrains :: Maybe (VU.Vector Subword) -> Subword -> Bool
-structureConstrains Nothing   _  = True
-structureConstrains (Just cs) (Subword (i:.j)) = subword i (j-1) `VU.elem` cs
+structureConstrains :: Maybe D1Secondary -> Subword -> Bool
+structureConstrains Nothing         !_               = True
+structureConstrains !(Just (D1S c)) (Subword (i:.j)) = (i<j) && (VU.unsafeIndex c i == j-1)
 {-# INLINE structureConstrains #-}
 
 structC :: Primary -> Subword -> Bool
@@ -270,25 +270,23 @@ type CombSignature m e b = Signature m (e, m (SM.Stream m b)) (SM.Stream m b)
     hS phfs
 
 
-
-rnaEval ener inp str = (struct ! (Z:.subword 0 n), bt) where
+rnaEval :: Vienna2004 -> Primary -> D1Secondary -> (Deka,[String])
+rnaEval ener inp s = (struct ! (Z:.subword 0 n), bt) where
   (_,Z:.Subword (_:.n)) = bounds weak
-  len = P.length inp
-  vinp = mkPrimary inp
-  s = VU.fromList . P.map (P.uncurry subword) $ dotBracket ["()"] str
-  (weak,block,comps,struct) = unsafePerformIO (rnaFoldFill ener (Just s) vinp)
-  bt = backtrack ener (Just s) vinp (weak,block,comps,struct)
+  len = VU.length inp
+  (weak,block,comps,struct) = unsafePerformIO (rnaFoldFill ener (Just s) inp)
+  bt = backtrack ener (Just s) inp (weak,block,comps,struct)
 {-# NOINLINE rnaEval #-}
 
+rnaFold :: Vienna2004 -> Primary -> (Deka,[String])
 rnaFold ener inp = (struct ! (Z:.subword 0 n), bt) where
   (_,Z:.Subword (_:.n)) = bounds weak
-  len = P.length inp
-  vinp = mkPrimary inp
-  (weak,block,comps,struct) = unsafePerformIO (rnaFoldFill ener Nothing vinp)
-  bt = backtrack ener Nothing vinp (weak,block,comps,struct)
+  len = VU.length inp
+  (weak,block,comps,struct) = unsafePerformIO (rnaFoldFill ener Nothing inp)
+  bt = backtrack ener Nothing inp (weak,block,comps,struct)
 {-# NOINLINE rnaFold #-}
 
-rnaFoldFill :: Vienna2004 -> Maybe (VU.Vector Subword) -> Primary -> IO (PA.Unboxed (Z:.Subword) Deka, PA.Unboxed (Z:.Subword) Deka, PA.Unboxed (Z:.Subword) Deka, PA.Unboxed (Z:.Subword) Deka)
+rnaFoldFill :: Vienna2004 -> Maybe (D1Secondary) -> Primary -> IO (PA.Unboxed (Z:.Subword) Deka, PA.Unboxed (Z:.Subword) Deka, PA.Unboxed (Z:.Subword) Deka, PA.Unboxed (Z:.Subword) Deka)
 rnaFoldFill !ener !cs !inp = do
   let n = VU.length inp
   !weak'  <- newWithM (Z:.subword 0 0) (Z:.subword 0 n) huge

@@ -55,6 +55,7 @@ executable RNAFold
     cmdargs   >= 0.10     ,
     BiobaseTurner  >= 0.3 ,
     BiobaseVienna  >= 0.3 ,
+    BiobaseXNA     >= 0.7 ,
     RNAFold
   main-is:
     RNAFold.hs
@@ -74,6 +75,7 @@ executable RNAEval
     cmdargs   >= 0.10     ,
     BiobaseTurner  >= 0.3 ,
     BiobaseVienna  >= 0.3 ,
+    BiobaseXNA     >= 0.7 ,
     RNAFold
   main-is:
     RNAEval.hs

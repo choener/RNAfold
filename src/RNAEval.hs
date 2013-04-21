@@ -9,6 +9,8 @@ module Main where
 
 import System.Console.CmdArgs
 
+import Biobase.Primary
+import Biobase.Secondary.Diagrams
 import Biobase.Vienna
 import BioInf.RNAfold
 import qualified Biobase.Turner.Import as TI
@@ -35,7 +37,7 @@ toPairs [] = []
 
 run' tm (inp,str) = do
   print $ length inp
-  print $ rnaEval tm inp str
+  print $ rnaEval tm (mkPrimary inp) (mkD1S str)
 
 
 
