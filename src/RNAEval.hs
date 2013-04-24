@@ -15,28 +15,44 @@ import Biobase.Vienna
 import qualified Biobase.Turner.Import as TI
 
 import BioInf.ViennaRNA.Fold
+import BioInf.ViennaRNA.Eval
 
 
 
-data Options = Options
-  { params :: String
-  } deriving (Show,Data,Typeable)
+data Options
+  = Eval
+      { params :: String
+      }
+  | ConstrainedFold
+      { params :: String
+      }
+  deriving (Show,Data,Typeable)
 
-options = Options
+oEval = Eval
   { params = "./params" &= help "Turner 2004 RNA parameters (defaults to ./params)"
   }
 
+oConstrainedFold = ConstrainedFold
+  { params = "../params"
+  }
+
 main = do
-  Options{..} <- cmdArgs options
+  o <- cmdArgs $ modes [oEval &= auto, oConstrainedFold]
   xs <- fmap lines getContents
-  tm <- fmap turnerToVienna $ TI.fromDir params "" ".dat"
-  mapM_ (run' tm) $ toPairs xs
+  tm <- fmap turnerToVienna $ TI.fromDir (params o) "" ".dat"
+  case o of
+    Eval{..}            -> mapM_ (doEval tm) $ toPairs xs
+    ConstrainedFold{..} -> mapM_ (doCF   tm) $ toPairs xs
 
 toPairs (x1:x2:xs) = (x1,x2) : toPairs xs
 toPairs [x] = error "single last line remaining"
 toPairs [] = []
 
-run' tm (inp,str) = do
+doEval tm (inp,str) = do
+  print $ length inp
+  print $ rnaEval tm (mkPrimary inp) (mkD1S str)
+
+doCF tm (inp,str) = do
   print $ length inp
   print $ rnaFoldConstrained tm (mkPrimary inp) (mkD1S str)
 
@@ -44,7 +60,7 @@ run' tm (inp,str) = do
 
 test inp str = do
   tm <- fmap turnerToVienna $ TI.fromDir "./params" "" ".dat"
-  run' tm (inp,str)
+  doEval tm (inp,str)
 
 tests = mapM_ (uncurry test)
   [ ( "CCUGACUGGCGUUGACAUAUGGUU"
