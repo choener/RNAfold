@@ -1,5 +1,5 @@
 name:           RNAFold
-version:        1.99.3.0
+version:        1.99.3.1
 author:         Christian Hoener zu Siederdissen (Haskell), Ivo L. Hofacker et al (ViennaRNA), 2010-2013
 copyright:      Christian Hoener zu Siederdissen, 2010-2013
 homepage:       http://www.tbi.univie.ac.at/~choener/adpfusion
@@ -41,7 +41,11 @@ library
     BiobaseXNA     >= 0.7     ,
     PrimitiveArray >= 0.5
   exposed-modules:
-    BioInf.RNAfold
+    BioInf.ViennaRNA
+    BioInf.ViennaRNA.Energy
+    BioInf.ViennaRNA.Eval
+    BioInf.ViennaRNA.Fold
+    BioInf.ViennaRNA.Signature
   ghc-options:
     -Odph
     -funbox-strict-fields

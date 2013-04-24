@@ -11,8 +11,9 @@ import System.Console.CmdArgs
 
 import Biobase.Primary
 import Biobase.Vienna
-import BioInf.RNAfold
 import qualified Biobase.Turner.Import as TI
+
+import BioInf.ViennaRNA.Fold
 
 
 
