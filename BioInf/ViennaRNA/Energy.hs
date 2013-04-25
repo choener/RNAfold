@@ -1,3 +1,4 @@
+{-# LANGUAGE PatternGuards #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
 {-# LANGUAGE BangPatterns #-}
 
@@ -7,7 +8,8 @@ import Data.Vector.Fusion.Stream.Monadic as SM
 import qualified Data.Vector.Unboxed as VU
 import Control.Lens
 import Data.Array.Repa.Index
-import Prelude as P hiding (Maybe(..))
+import Prelude as P
+import qualified Data.Map as M
 
 import Data.PrimitiveArray as PA hiding ((!))
 import Data.PrimitiveArray.Zero as PA
@@ -18,11 +20,15 @@ import Biobase.Primary
 
 import BioInf.ViennaRNA.Signature
 
+import Debug.Trace
+
 
 
 mfe :: Monad m => Signature m Deka Deka
 mfe = (hairpin,interior,multi,blockStem,blockUnpair,compsBR,compsBC,structW,structCS,structWS,structOpen,h) where
   hairpin ener l lp xs rp r
+      | len <= 6
+      , Just e <- (l `VU.cons` xs `VU.snoc` r) `M.lookup` _hairpinLookup ener = e
       | len <   3 = huge
       | len ==  3 = (ener^.hairpinL) VU.! len + tAU
       | len < 31  = (ener^.hairpinL) VU.! len + ener^.hairpinMM!(Z:.l:.r:.lp:.rp)
@@ -66,11 +72,9 @@ mfe = (hairpin,interior,multi,blockStem,blockUnpair,compsBR,compsBC,structW,stru
         rH = VU.unsafeHead rs
         rL = VU.unsafeLast rs
   multi ener l li b c ri r
-    = b + c + _multiMM ener ! (Z:.l:.r:.li:.ri) + _multiHelix ener + _multiOffset ener + tAU where
-        tAU = if (l,r)   `P.elem` [(nC,nG), (nG,nC)] then Deka 0 else ener^.termAU
+    = b + c + _multiMM ener ! (Z:.r:.l:.ri:.li) + _multiHelix ener + _multiOffset ener where
   blockStem ener lo l s r ro
-    = s + _multiMM ener ! (Z:.r:.l:.ro:.lo) + _multiHelix ener where
-        tAU = if (l,r)   `P.elem` [(nC,nG), (nG,nC)] then Deka 0 else ener^.termAU
+    = s + _multiMM ener ! (Z:.l:.r:.lo:.ro) + _multiHelix ener
   blockUnpair ener c b
     = b + _multiNuc ener
   compsBR ener b reg
