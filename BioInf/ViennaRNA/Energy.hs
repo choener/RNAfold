@@ -48,7 +48,7 @@ mfe = (hairpin,interior,multi,blockStem,blockUnpair,compsBR,compsBC,structW,stru
       | lls==2 && lrs==1
       = w + _iloop2x1 ener ! (Z:.l:.r:.ri:.li:.rH:.lH:.lL)
       | lls==2 && lrs==2
-      = w + _iloop2x2 ener ! (Z:.l:.r:.r:.li:.lH:.lL:.rH:.rL)
+      = w + _iloop2x2 ener ! (Z:.l:.r:.ri:.li:.lH:.lL:.rH:.rL)
       | min lls lrs == 2 && max lls lrs == 3
       = w + _iloop2x3MM ener ! (Z:.l:.r:.lH:.lL) + _iloop2x3MM ener ! (Z:.ri:.li:.rL:.rH) + _iloopL ener VU.! 5 + _ninio ener
       | lls==0 && lrs > 1 && lrs <= 30
