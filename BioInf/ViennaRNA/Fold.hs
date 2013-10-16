@@ -18,6 +18,7 @@ import Data.Strict.Tuple
 import Biobase.Secondary.Diagrams
 import Data.Array.Repa.Index.Subword
 import ADP.Fusion
+import ADP.Fusion.Table
 import Biobase.Vienna
 import Biobase.Primary
 import Data.PrimitiveArray as PA hiding ((!))
@@ -157,7 +158,7 @@ rnaFoldFill !ener !cs !inp = do
   !block' <- newWithM (Z:.subword 0 0) (Z:.subword 0 n) huge
   !comps' <- newWithM (Z:.subword 0 0) (Z:.subword 0 n) huge
   !struc' <- newWithM (Z:.subword 0 0) (Z:.subword 0 n) 0
-  fillTables $ gRNAfold ener mfe (MTbl NoEmptyT weak') (MTbl NoEmptyT block') (MTbl NoEmptyT comps') (MTbl NoEmptyT struc') cs inp
+  fillTables $ gRNAfold ener mfe (mTblSw NonEmptyT weak') (mTblSw NonEmptyT block') (mTblSw NonEmptyT comps') (mTblSw NonEmptyT struc') cs inp
   weakF  <- freeze weak'
   blockF <- freeze block'
   compsF <- freeze comps'
@@ -178,10 +179,14 @@ fillTables (MTbl _ weak, weakF, MTbl _ block, blockF, MTbl _ comps, compsF, MTbl
 
 backtrack ener cs (inp :: Primary) (weak :: PA.Unboxed (Z:.Subword) Deka, block :: PA.Unboxed (Z:.Subword) Deka, comps :: PA.Unboxed (Z:.Subword) Deka, struct :: PA.Unboxed (Z:.Subword) Deka) = unId . SM.toList . unId $ sF $ subword 0 n where
   n = VU.length inp
-  w = BtTbl NoEmptyT weak   (wF :: Subword -> Id (SM.Stream Id String))
-  b = BtTbl NoEmptyT block  (bF :: Subword -> Id (SM.Stream Id String))
-  c = BtTbl NoEmptyT comps  (cF :: Subword -> Id (SM.Stream Id String))
-  s = BtTbl NoEmptyT struct (sF :: Subword -> Id (SM.Stream Id String))
+  w :: SwBtTbl Id Deka String
+  w = btTbl NonEmptyT weak   (wF :: Subword -> Id (SM.Stream Id String))
+  b :: SwBtTbl Id Deka String
+  b = btTbl NonEmptyT block  (bF :: Subword -> Id (SM.Stream Id String))
+  c :: SwBtTbl Id Deka String
+  c = btTbl NonEmptyT comps  (cF :: Subword -> Id (SM.Stream Id String))
+  s :: SwBtTbl Id Deka String
+  s = btTbl NonEmptyT struct (sF :: Subword -> Id (SM.Stream Id String))
   (_,wF,_,bF,_,cF,_,sF) = gRNAfold ener (mfe <** pretty) w b c s cs inp
 {-# INLINE backtrack #-}
 
